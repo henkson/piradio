@@ -5,6 +5,7 @@ import pygame
 
 from button import Button, ToggleButton
 import colors
+from pitft.pitft import PiTFT
 from scene import Scene
 from image_tools import resize_to_fill
 
@@ -262,7 +263,7 @@ if __name__ == '__main__':
 
     clock = pygame.time.Clock()
 
-    mytft = pitft.PiTFT(False)
+    mytft = PiTFT(False)
     init_rect = pygame.Rect(screen.get_rect())
     bg = pygame.Surface(screen.get_size()).convert()
 

@@ -200,8 +200,10 @@ class SelectionPane:
 
     def update(self, event, offset):  # pygame event, must not be None
         if event.type == pygame.USEREVENT or event.type == pygame.MOUSEBUTTONDOWN:
-            x,y = event.pos[0] + offset[0], event.pos[1] + offset[1]
-            col,row = int(math.ceil((x - border) / (self.img_size[0] + spacing))), int(math.ceil((y - border) / (self.img_size[1] + spacing)))
+            x = event.pos[0] + offset[0]
+            y = event.pos[1] + offset[1]
+            col = int(math.floor((x - border) / (self.img_size[0] + spacing)))
+            row = int(math.floor((y - border) / (self.img_size[1] + spacing)))
             nb = (row * nb_cols) + col
             playlist = self.playlists[nb]
             self.logger.debug("%s -> %s -> %s -> %s -> %s", str(event.pos), str((x,y)), str((col,row)), str(nb), playlist.playlist)

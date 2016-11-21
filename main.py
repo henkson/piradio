@@ -1,6 +1,6 @@
-from pitft import *
+from pitft.pitft import PiTFT
+import pygame
 import pygame.constants as const
-import sys
 import argparse
 import logging
 
@@ -68,7 +68,7 @@ def main():
     logger.info("==== here we go again")
     logger.debug("commandline args: %s", str(args))
 
-    mytft = pitft.PiTFT(args.stand_alone)
+    mytft = PiTFT(args.stand_alone)
     init_rect = pygame.Rect(mytft.screen.get_rect())
     bg = pygame.Surface(mytft.screen.get_size()).convert()
 

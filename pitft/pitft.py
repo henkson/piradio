@@ -23,7 +23,7 @@ def init_pitft():
 
     disp_no = os.getenv("DISPLAY")
     if disp_no:
-        print "I'm running under X display = {0}".format(disp_no)
+        print("I'm running under X display = {0}".format(disp_no))
 
     os.putenv('SDL_FBDEV', '/dev/fb1')
     os.putenv('SDL_MOUSEDEV', '/dev/input/touchscreen')
@@ -37,7 +37,7 @@ def init_pitft():
     try:
         pygame.display.init()
     except pygame.error:
-        print 'Driver: {0} failed.'.format(driver)
+        print('Driver: {0} failed.'.format(driver))
         exit(0)
 
     size = (pygame.display.Info().current_w, pygame.display.Info().current_h)

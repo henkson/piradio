@@ -8,7 +8,7 @@ pygame.init()
 
 CAPTION = "TEST"
 
-class Game():
+class Game:
     def __init__(self):
         #window setup
         pygame.display.set_caption(CAPTION)
@@ -32,11 +32,11 @@ class Game():
         #start loop
         self.clock.tick(self.fps)
         while 1:
-            self.Loop()
+            self.loop()
 
-    def Loop(self):
+    def loop(self):
         # main game loop
-        self.eventLoop()
+        self.event_loop()
 
         self.last_tick = pygame.time.get_ticks()
 
@@ -58,7 +58,7 @@ class Game():
         pygame.display.update()
 
 
-    def eventLoop(self):
+    def event_loop(self):
         # the main event loop, detects keypresses
         for event in pygame.event.get():
             if event.type == QUIT:
