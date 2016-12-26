@@ -3,6 +3,7 @@ import logging
 from socket import error as SocketError
 from time import sleep
 import pygame
+import image_tools
 
 __author__ = 'jeroen'
 
@@ -13,9 +14,12 @@ paths = {}
 
 class Playlist:
 
-    def __init__(self, pl_dict):
+    def __init__(self, pl_dict, img_loader, def_img):
         self.playlist = pl_dict['playlist']
         self.last_modified = pl_dict['last-modified']
+        self.cover_img = def_img
+
+        self.listeners = []
 
         m3u_file = self.playlist + '.m3u'
         with open(os.path.join(paths['playlists_path'], m3u_file), 'r') as f:
@@ -29,9 +33,17 @@ class Playlist:
                 if hasattr(self, 'path') and hasattr(self, 'cover'):
                     break  # exit lines-loop
         try:
-            self.cover_img = pygame.image.load(os.path.join(paths['music_path'] + self.path, self.cover)).convert()
+            img_loader.add_work(os.path.join(paths['music_path'] + self.path, self.cover), self.set_cover)
         except AttributeError:
-            self.cover_img = pygame.image.load(os.path.join('player_icons', 'unknown.png')).convert()
+            pass
+
+    def set_cover(self, cover):
+        self.cover_img = cover
+        for l in self.listeners:
+            l.playlist_updated()
+
+    def add_listener(self, listener):
+        self.listeners.append(listener)
 
     def __str__(self):
         return "Playlist{'" + self.playlist + "', last_modified: '" + self.last_modified + "', path: '" + self.path\
@@ -40,7 +52,14 @@ class Playlist:
 
 class MyMPD:
     def __init__(self):
-        pass
+        self.loader = image_tools.Loader()
+        self.default_cover = None
+        self.loader.add_work(filename=os.path.join('player_icons', 'unknown.png'), callback=self.__set_def_img)
+        self.loader.join()
+        logging.debug("MyMPD init finished, self.default_cover=" + str(self.default_cover))
+
+    def __set_def_img(self, img):
+        self.default_cover = img
 
     def connect(self):
         raise NotImplementedError
@@ -125,9 +144,9 @@ class WinMPD(MyMPD):
         listdir = os.listdir(paths['playlists_path'])
         listdir.sort()
 
-        for f in listdir[:10]:  # load only 10 playlists
+        for f in listdir: #[:13]:  # load only 13 playlists
             if f.endswith('.m3u'):
-                playlist = Playlist({'playlist':f[:-4],'last-modified':'now'})
+                playlist = Playlist({'playlist':f[:-4],'last-modified':'now'}, self.loader, self.default_cover)
                 playlists.append(playlist)
                 self.logger.debug("loaded playlist " + str(playlist.playlist))
             else:
@@ -208,7 +227,7 @@ class WinMPD(MyMPD):
                     self.current_song = None
                     self.stop()
 
-            status['song']=self.current_song-1  # -1 want zero-based
+            status['song']=str(self.current_song-1)  # -1 want zero-based
             status['track']=self.current_song
             status['title']='Liedje nummer ' + str(self.current_song)
             if self.playing:
@@ -263,7 +282,7 @@ class PiMPD(MyMPD):
         source.sort(key=lambda current: current['playlist'])
 
         for pl in source:
-            playlist = Playlist(pl)
+            playlist = Playlist(pl, self.loader, self.default_cover)
             playlists.append(playlist)
             self.logger.debug("loaded playlist " + str(playlist.playlist))
 
@@ -303,4 +322,6 @@ class PiMPD(MyMPD):
         # {'songid': '1', 'playlistlength': '15', 'playlist': '18', 'repeat': '0', 'consume': '0', 'mixrampdb': '0.000000', 'random': '0', 'state': 'play', 'xfade': '0', 'volume': '55', 'single': '0', 'mixrampdelay': 'nan', 'nextsong': '1', 'time': '70:172', 'song': '0', 'elapsed': '69.590', 'bitrate': '1155', 'nextsongid': '2', 'audio': '44100:16:2'}
         # client.currentsong()
         # {'album': 'Sensacional', 'albumartistsort': 'Tattoo del Tigre, El', 'date': '2003', 'title': 'El Tattoo del Tigre', 'track': '1', 'artist': 'El Tattoo del Tigre', 'albumartist': 'El Tattoo del Tigre', 'pos': '0', 'musicbrainz_albumid': '5e97a895-e962-4f1e-ac24-bdf7727d47a1', 'last-modified': '2013-01-29T21:08:26Z', 'disc': '1', 'musicbrainz_albumartistid': '328f63af-ccf1-4735-b493-c5490281e5ca', 'artistsort': 'Tattoo del Tigre, El', 'file': 'library/El Tattoo Del Tigre/[2003] Sensacional/01 El Tattoo Del Tigre - El Tattoo Del Tigre.flac', 'time': '173', 'genre': 'Pop', 'musicbrainz_artistid': '328f63af-ccf1-4735-b493-c5490281e5ca', 'musicbrainz_trackid': '87e82228-d36d-44b8-8f6b-894b32ddadc8', 'id': '1'}
-        return dict(self.client.status().items() + self.client.currentsong().items())
+        copy = self.client.status().copy()
+        copy.update(self.client.currentsong())
+        return copy

@@ -6,20 +6,21 @@ import logging
 
 from scroll import ScrollPane
 import player
-#from mympd import PiMPD
 
 
 class SceneManager:
     scene = None
 
-    def __init__(self, initial):
+    def __init__(self, screen, initial):
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.screen = screen
         self.go_to(initial)
 
     def go_to(self, scene):
         self.logger.debug('go to ' + str(scene))
         self.scene = scene
         self.scene.manager = self
+        self.scene.clear(self.screen)
 
 
 class LoggerFactory:
@@ -83,7 +84,7 @@ def main():
     playlist_selector.player = myplayer
 
     # scene manager
-    manager = SceneManager(playlist_selector)
+    manager = SceneManager(mytft.screen, playlist_selector)
 
     manager.scene.draw(bg)
     origin = (0,0)
@@ -99,11 +100,10 @@ def main():
                     loop = False
                     break
                 manager.scene.handle(event)
-            changes = manager.scene.draw(bg)
-            mytft.screen.blit(bg, origin)  # fixme: deze lijn zou eigenlijk weg moeten kunnen...
+            changes = manager.scene.draw(mytft.screen)
             pygame.display.update(changes)
         except Exception as e:
-            logger.error("Error occured: %s", str(e))
+            logger.exception("Error occured: %s", e)
 
     mytft.exit()
 

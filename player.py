@@ -32,7 +32,6 @@ class Progress(pygame.sprite.DirtySprite):
         self.area = screen.get_rect()
 
         self.blinking = False
-        self.alpha = -25.5
 
     def set_progress(self,
                      progress):  # value between 0 and 1
@@ -57,12 +56,6 @@ class Progress(pygame.sprite.DirtySprite):
 
     def update(self):
         if self.blinking:
-            # alpha = self.image.get_alpha() + self.alpha
-            # if alpha >= 255 or alpha <= 0:
-            #     self.alpha = -self.alpha
-            # value = min(max(int(alpha), 0), 255)
-            # self.logger.debug("image.set_alpha(" + str(value) + ")")
-            # self.image.set_alpha(value)
             import time
             t = int(time.time() * 1.5) % 2 == 0
             vis = 1 if t else 0
@@ -70,9 +63,6 @@ class Progress(pygame.sprite.DirtySprite):
                 self.logger.debug("self.set_visible(" + str(vis) + ")")
                 self.visible = vis
                 self._make_dirty()
-            else:
-                #self.logger.debug("self.visible = " + str(self.visible))
-                pass
 
     def _make_dirty(self):
         if self.dirty != 2:
@@ -84,6 +74,79 @@ class Progress(pygame.sprite.DirtySprite):
         pass
 
 
+class Gradient(pygame.sprite.DirtySprite):
+    def __init__(self, size, position, top_down=True, fill=1.0):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        pygame.sprite.DirtySprite.__init__(self)
+
+        surface = pygame.Surface(size).convert_alpha()
+        surface.fill(pygame.Color(0,0,0,0)) # fully transparent
+
+        assert 0 <= fill <= 1
+
+        gradient = pygame.image.load(os.path.join('player_icons', 'gradient-black-transp.png')).convert_alpha()
+        gradient = pygame.transform.scale(gradient, (size[0], int(size[1] * fill)))
+
+        surface.fill(colors.black, pygame.Rect(0, 0, size[0], size[1] * (1 - fill)))
+        surface.blit(gradient, (0,size[1] - size[1]*fill))
+
+        if top_down:
+            self.image = surface
+        else:
+            self.image = pygame.transform.flip(surface, False, True)
+        self.rect = self.image.get_rect()
+        self.set_position(*position)
+        self.logger.debug(str(self) + ': init done, image=' + str(self.image) + ", rect=" + str(self.rect))
+
+    def set_position(self, x, y):
+        self.logger.debug(str(self) + '.set_position(' + str((x,y)) + ')')
+        self.rect.x, self.rect.y = x, y
+        self._make_dirty()
+        return self.rect.copy()
+
+    def _make_dirty(self):
+        if self.dirty != 2:
+            self.dirty = 1
+
+
+class InfoText(pygame.sprite.DirtySprite):
+    def __init__(self, width, position):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        pygame.sprite.DirtySprite.__init__(self)
+
+        self.font = pygame.font.Font(None, 24)
+
+        self.rect = pygame.Rect(position,(width,20))
+
+        self.text = ""
+        self.image = self._create_surface()
+
+        self.logger.debug(str(self) + ': init done, image=' + str(self.image) + ", rect=" + str(self.rect))
+
+    def set_text(self, text):
+        if self.text != text:
+            self.logger.debug(str(self) + '.set_text(' + text + ')')
+            self.text = text
+            self.image = self._create_surface()
+
+    def _create_surface(self):
+        surface = pygame.Surface((self.rect.width, self.rect.height)).convert_alpha()
+        surface.fill(pygame.Color(0,0,0,0)) # fully transparent
+        surface.blit(self.font.render(self.text, 1, colors.grey), (5, 0))
+        self._make_dirty()
+        return surface
+
+    def set_position(self, x, y):
+        self.logger.debug(str(self) + '.set_position(' + str((x,y)) + ')')
+        self.rect.x, self.rect.y = x, y
+        self._make_dirty()
+        return self.rect.copy()
+
+    def _make_dirty(self):
+        if self.dirty != 2:
+            self.dirty = 1
+
+
 class Player(Scene):
 
     playlist = None
@@ -91,7 +154,6 @@ class Player(Scene):
     dirty = True
 
     sprites = pygame.sprite.LayeredDirty()
-    # sprites = pygame.sprite.Group()
 
     def __init__(self,
                  mytft,  # PiTFT
@@ -100,6 +162,13 @@ class Player(Scene):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.mytft = mytft
         self.mympd = mytft.mympd
+
+        self.screen_size = browser.view_port.size
+
+        self.top_grad = Gradient(size=(self.screen_size[0],45),position=(0,0))
+        self.sprites.add(self.top_grad)
+        self.bottom_grad = Gradient(size=(self.screen_size[0],60),position=(0,self.screen_size[1]-60), top_down=False, fill=0.5)
+        self.sprites.add(self.bottom_grad)
 
         self.previous_btn = self.create_button('previous', self.mympd.previous)
         self.next_btn = self.create_button('next', self.mympd.next)
@@ -114,14 +183,10 @@ class Player(Scene):
         self.progress = Progress()
         self.sprites.add(self.progress)
 
-        # positioning the buttons on the screen
-        # i = 0
-        # screen = pygame.display.get_surface()
-        # self.screen_size = screen.get_rect()
-        self.screen_size = browser.view_port.size
+        self.info_text = InfoText(self.screen_size[0], (0,self.screen_size[1]-20))
+        self.sprites.add(self.info_text)
 
-        self.background = pygame.display.get_surface()
-        self.background.convert()
+        self.background = pygame.display.get_surface().convert()
 
         # buttons at bottom of screen, from left to right
         y = self.screen_size[1] - 45 - self.x_offset(0, 7)
@@ -138,8 +203,6 @@ class Player(Scene):
         i -= 1
         x = self.x_offset(i, len(btns))
         self.list_btn.set_position(x,y)
-
-        self.font = pygame.font.Font(None, 24)
 
     def create_button(self, name, callback):
         btn = Button(name, callback)
@@ -202,9 +265,13 @@ class Player(Scene):
         #     print "Player: handle(" + str(event) + ")"
         if event.type == pygame.MOUSEBUTTONDOWN:
             clicked_buttons = [b for b in self.sprites if b.rect.collidepoint(event.pos)]
-            for button in clicked_buttons:
+            if clicked_buttons:
+                button = clicked_buttons[-1] # if multiple buttons on top of each other: topmost button only
                 self.logger.debug("clicked on " + str(button.name) + " button")
                 button.execute()
+
+    def clear(self, screen):
+        self.sprites.clear(screen, self.cover_img[0])
 
     def draw(self, surface):
         result = []
@@ -213,24 +280,28 @@ class Player(Scene):
 
         # proceed button
         try:
-            # result.append(self.proceed.rect.copy())
             progress = float(status['elapsed']) / int(self.mympd.currentsong()['time'])
         except KeyError:  # can't find key 'elapsed' or 'time'
             progress = 0
 
-        change = self.progress.set_progress(progress) \
-                 or self.previous_btn.set_visible('song' in status and status['song'] > 0) \
-                 or self.next_btn.set_visible('nextsong' in status)
-        if change:
-            self.dirty = True  # fixme: dit zou toch niet moeten als we LayeredDirty gebruiken?? :-(
-            pass
-
-        screen_size = surface.get_size()
+        self.progress.set_progress(progress)
+        self.previous_btn.set_visible('song' in status and int(status['song']) > 0)
+        self.next_btn.set_visible('nextsong' in status)
+        if 'title' in status:
+            text = status['title']
+        else:
+            text = "(?)"
+        if 'track' in status:
+            text = str(status['track']) + " - " + text
+        elif 'song' in status:
+            text = str(int(status['song']) + 1) + " - " + text
+        self.info_text.set_text(text)
 
         # album-art tekenen
         if self.dirty:
             self.background.blit(self.cover_img[0], self.cover_img[1])
-            result.append(surface.blit(self.background, (0,0)))
+            surface.blit(self.background, (0,0))
+            pygame.display.flip()
             for s in self.sprites:
                 s._make_dirty()
             self.sprites.clear(surface, self.background)
@@ -240,12 +311,6 @@ class Player(Scene):
         result.extend(self.sprites.draw(surface))
         self.dirty = False
 
-        # altijd: huidig nummer, huidige positie
-        label1 = self.font.render(str(status['track']), 1, colors.blue)
-        label2 = self.font.render(status['title'], 1, colors.red)
-        result.append(surface.blit(label1, (20, 60)))
-        result.append(surface.blit(label2, (20, 100)))
-
         return result
 
     def x_offset(self, i, nb):
@@ -254,34 +319,33 @@ class Player(Scene):
 
 if __name__ == '__main__':
     # test code to immediately run player
-    import pitft
+    log_level = logging.DEBUG
+    log_format = '%(levelname)-7s %(asctime)-15s %(name)s: %(message)s'
+    logging.basicConfig(format=log_format,level=log_level)
 
     pygame.display.init()
     pygame.display.set_caption("Example")
-    screen_size = (320,240)
-    screen = pygame.display.set_mode(screen_size)
 
     clock = pygame.time.Clock()
 
     mytft = PiTFT(False)
+    screen = mytft.screen
     init_rect = pygame.Rect(screen.get_rect())
     bg = pygame.Surface(screen.get_size()).convert()
 
     class MyBrowser:
         def __init__(self):
             self.view_port = init_rect
-
     browser = MyBrowser()
+
     myplayer = Player(mytft, browser)
 
     class MyPlaylist:
         def __init__(self):
             self.playlist = "test"
-            self.cover_img = pygame.image.load(os.path.join('player_icons', 'unknown.png')).convert_alpha()
-
+            self.cover_img = pygame.image.load(os.path.join('player_icons', 'Cover.png')).convert_alpha()
     playlist = MyPlaylist()
 
-    screen.fill(colors.yellow)
     pygame.display.flip()
     myplayer.start_playlist(playlist)
     loop = True
@@ -292,9 +356,7 @@ if __name__ == '__main__':
                 loop = False
                 break
             myplayer.handle(event)
-        changes = myplayer.draw(bg)
-        # screen.blit(bg, (0,0))
-        pygame.display.update(changes)
+        pygame.display.update(myplayer.draw(screen))
 
     mytft.exit()
 

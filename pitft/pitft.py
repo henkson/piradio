@@ -85,7 +85,7 @@ class PiTFT:
         if self.platform == "Linux":
             self.clock.tick(360)
         elif self.platform == "Windows":
-            self.clock.tick(180)
+            self.clock.tick(80)
 
     def exit(self):
         self.logger.info("exit")

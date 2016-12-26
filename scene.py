@@ -10,6 +10,9 @@ class Scene(object):
     def draw(self, surface):
         raise NotImplementedError
 
+    def clear(self, screen):
+        raise NotImplementedError
+
     # def update(self):
     #     raise NotImplementedError
 

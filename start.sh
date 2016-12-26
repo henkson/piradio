@@ -5,4 +5,4 @@ SCRIPTPATH=`pwd -P`
 popd > /dev/null
 
 cd $SCRIPTPATH
-sudo python main.py --stand-alone
+sudo python3 main.py --stand-alone

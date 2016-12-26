@@ -53,6 +53,9 @@ class Button(pygame.sprite.DirtySprite):
         else:
             self.logger.debug(self.name + ' not executed because I\'m not visible!')
 
+    def __str__(self):
+        return self.name
+
 
 class ToggleButton(Button):
 
