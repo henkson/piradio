@@ -51,8 +51,8 @@ class Playlist:
 
 
 class MyMPD:
-    def __init__(self):
-        self.loader = image_tools.Loader()
+    def __init__(self, screen_size=None):
+        self.loader = image_tools.Loader(screen_size)
         self.default_cover = None
         self.loader.add_work(filename=os.path.join('player_icons', 'unknown.png'), callback=self.__set_def_img)
         self.loader.join()
@@ -125,8 +125,8 @@ class WinMPD(MyMPD):
     playing = False
     paused = None
 
-    def __init__(self):
-        MyMPD.__init__(self)
+    def __init__(self, size=None):
+        MyMPD.__init__(self, size)
 
         global paths
         base_path = "\\\\DiskStation\\"
@@ -246,8 +246,8 @@ class WinMPD(MyMPD):
 class PiMPD(MyMPD):
     connected = False
 
-    def __init__(self):
-        MyMPD.__init__(self)
+    def __init__(self, screen_size):
+        MyMPD.__init__(self, screen_size)
 
         import mpd
 
@@ -274,11 +274,22 @@ class PiMPD(MyMPD):
 
         self.logger.debug("mpd: connected, status=" + self.client.status()['state'])
 
-    def init_playlists(self):
-        if not self.connected:
+    def __client_call(self, call, *args):
+        try:
             self.connect()
+            if args:
+                return call(*args)
+            else:
+                return call()
+        except mpd.ConnectionError as e:
+            self.connected = False
+            self.logger.info('mpd: ConnectionError (' + str(e) + '), reconnecting...')
+            self.connect()
+            return self.__client_call(call, *args)
+
+    def init_playlists(self):
         playlists = []
-        source = self.client.listplaylists()
+        source = self.__client_call(self.client.listplaylists)
         source.sort(key=lambda current: current['playlist'])
 
         for pl in source:
@@ -291,37 +302,37 @@ class PiMPD(MyMPD):
         return playlists
 
     def clear(self):
-        self.client.clear()
+        self.__client_call(self.client.clear)
 
     def previous(self):
-        self.client.previous()
+        self.__client_call(self.client.previous)
 
     def next(self):
-        self.client.next()
+        self.__client_call(self.client.next)
 
     def play(self):
-        self.client.play()
+        self.__client_call(self.client.play)
 
     def pause(self):
-        self.client.pause()
+        self.__client_call(self.client.pause)
 
     def stop(self):
-        self.client.stop()
+        self.__client_call(self.client.stop)
 
     def setvol(self, v):
-        self.client.setvol(v)
+        self.__client_call(self.client.setvol, v)
 
     def load(self, playlist):
-        self.client.load(playlist)
+        self.__client_call(self.client.load, playlist)
 
     def currentsong(self):
-        return self.client.currentsong()
+        return self.__client_call(self.client.currentsong)
 
     def status(self):
         # client.status()
         # {'songid': '1', 'playlistlength': '15', 'playlist': '18', 'repeat': '0', 'consume': '0', 'mixrampdb': '0.000000', 'random': '0', 'state': 'play', 'xfade': '0', 'volume': '55', 'single': '0', 'mixrampdelay': 'nan', 'nextsong': '1', 'time': '70:172', 'song': '0', 'elapsed': '69.590', 'bitrate': '1155', 'nextsongid': '2', 'audio': '44100:16:2'}
         # client.currentsong()
         # {'album': 'Sensacional', 'albumartistsort': 'Tattoo del Tigre, El', 'date': '2003', 'title': 'El Tattoo del Tigre', 'track': '1', 'artist': 'El Tattoo del Tigre', 'albumartist': 'El Tattoo del Tigre', 'pos': '0', 'musicbrainz_albumid': '5e97a895-e962-4f1e-ac24-bdf7727d47a1', 'last-modified': '2013-01-29T21:08:26Z', 'disc': '1', 'musicbrainz_albumartistid': '328f63af-ccf1-4735-b493-c5490281e5ca', 'artistsort': 'Tattoo del Tigre, El', 'file': 'library/El Tattoo Del Tigre/[2003] Sensacional/01 El Tattoo Del Tigre - El Tattoo Del Tigre.flac', 'time': '173', 'genre': 'Pop', 'musicbrainz_artistid': '328f63af-ccf1-4735-b493-c5490281e5ca', 'musicbrainz_trackid': '87e82228-d36d-44b8-8f6b-894b32ddadc8', 'id': '1'}
-        copy = self.client.status().copy()
-        copy.update(self.client.currentsong())
+        copy = self.__client_call(self.client.status).copy()
+        copy.update(self.__client_call(self.client.currentsong))
         return copy

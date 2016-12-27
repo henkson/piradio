@@ -57,10 +57,10 @@ class PiTFT:
 
         if self.platform == "Linux":
             self.screen = init_pitft()
-            self.mympd = mympd.PiMPD()
+            self.mympd = mympd.PiMPD(self.screen.get_size())
         elif self.platform == "Windows":
             self.screen = init_desktop()
-            self.mympd = mympd.WinMPD()
+            self.mympd = mympd.WinMPD(self.screen.get_size())
         else:
             raise Exception("unknown platform: " + self.platform)
 
