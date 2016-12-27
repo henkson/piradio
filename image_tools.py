@@ -26,9 +26,10 @@ def __resize(base_img, size, strategy):
 
 
 class Loader:
-    def __init__(self):
+    def __init__(self, size=None):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.queue = Queue()
+        self.size = size
         thread = Thread(target=self.__load)
         thread.setDaemon(True)
         thread.start()
@@ -37,7 +38,7 @@ class Loader:
         while True:
             filename, callback = self.queue.get()
             self.logger.debug("Worker.__load(filename=" + filename + ")")
-            callback(pygame.image.load(filename).convert_alpha())
+            callback(self.__scale_down(pygame.image.load(filename).convert_alpha()))
             self.queue.task_done()
 
     def add_work(self, filename, callback):
@@ -46,3 +47,15 @@ class Loader:
 
     def join(self):
         self.queue.join()
+
+    def __scale_down(self, base_img):
+        if not self.size:
+            return base_img
+        base_size = base_img.get_size()
+        scale_factor = max(self.size[0] / base_size[0], self.size[1] / base_size[1])
+        if scale_factor < 1:
+            self.logger.debug('scale down factor ' + str(scale_factor))
+            return pygame.transform.rotozoom(base_img, 0, scale_factor)
+        else:
+            return base_img
+
