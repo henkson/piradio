@@ -261,14 +261,13 @@ class Player(Scene):
         self.mytft.exit()
 
     def handle(self, event):
-        # if __debug__:
-        #     print "Player: handle(" + str(event) + ")"
         if event.type == pygame.MOUSEBUTTONDOWN:
             clicked_buttons = [b for b in self.sprites if b.rect.collidepoint(event.pos)]
             if clicked_buttons:
                 button = clicked_buttons[-1] # if multiple buttons on top of each other: topmost button only
-                self.logger.debug("clicked on " + str(button.name) + " button")
-                button.execute()
+                if hasattr(button, 'execute'):
+                    self.logger.debug("clicked on " + str(button) + " button")
+                    button.execute()
 
     def clear(self, screen):
         self.sprites.clear(screen, self.cover_img[0])
