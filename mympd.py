@@ -5,6 +5,12 @@ from time import sleep
 import pygame
 import image_tools
 
+try:
+    mpd = __import__('mpd')
+except ImportError:
+    # nevermind, probably running in windows
+    pass
+
 __author__ = 'jeroen'
 
 
@@ -248,8 +254,6 @@ class PiMPD(MyMPD):
 
     def __init__(self, screen_size):
         MyMPD.__init__(self, screen_size)
-
-        import mpd
 
         global paths
         mpd_path = "/var/lib/mpd/"
