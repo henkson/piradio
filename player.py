@@ -2,7 +2,8 @@ import os
 import logging
 
 import pygame
-
+from sprite import DisappearAppearSprite as MySprite, Location
+import time
 from button import Button, ToggleButton
 import colors
 from pitft.pitft import PiTFT
@@ -74,45 +75,33 @@ class Progress(pygame.sprite.DirtySprite):
         pass
 
 
-class Gradient(pygame.sprite.DirtySprite):
-    def __init__(self, size, position, top_down=True, fill=1.0):
+class Gradient(MySprite):
+    def __init__(self, size, position, location, screen, fill=1.0):
         self.logger = logging.getLogger(self.__class__.__name__)
-        pygame.sprite.DirtySprite.__init__(self)
+        self.image, self.rect = self._create_image(size, fill, location)
+        MySprite.__init__(self, location, position, screen)
 
+    @staticmethod
+    def _create_image(size, fill, location):
         surface = pygame.Surface(size).convert_alpha()
-        surface.fill(pygame.Color(0,0,0,0)) # fully transparent
-
+        surface.fill(pygame.Color(0, 0, 0, 0))  # fully transparent
         assert 0 <= fill <= 1
-
         gradient = pygame.image.load(os.path.join('player_icons', 'gradient-black-transp.png')).convert_alpha()
         gradient = pygame.transform.scale(gradient, (size[0], int(size[1] * fill)))
-
         surface.fill(colors.black, pygame.Rect(0, 0, size[0], size[1] * (1 - fill)))
-        surface.blit(gradient, (0,size[1] - size[1]*fill))
-
-        if top_down:
-            self.image = surface
+        surface.blit(gradient, (0, size[1] - size[1] * fill))
+        if location == Location.NORTH:
+            image = surface
+        elif location == Location.SOUTH:
+            image = pygame.transform.flip(surface, False, True)
         else:
-            self.image = pygame.transform.flip(surface, False, True)
-        self.rect = self.image.get_rect()
-        self.set_position(*position)
-        self.logger.debug(str(self) + ': init done, image=' + str(self.image) + ", rect=" + str(self.rect))
-
-    def set_position(self, x, y):
-        self.logger.debug(str(self) + '.set_position(' + str((x,y)) + ')')
-        self.rect.x, self.rect.y = x, y
-        self._make_dirty()
-        return self.rect.copy()
-
-    def _make_dirty(self):
-        if self.dirty != 2:
-            self.dirty = 1
+            assert False
+        return image, image.get_rect()
 
 
-class InfoText(pygame.sprite.DirtySprite):
-    def __init__(self, width, position):
+class InfoText(MySprite):
+    def __init__(self, width, position, screen):
         self.logger = logging.getLogger(self.__class__.__name__)
-        pygame.sprite.DirtySprite.__init__(self)
 
         self.font = pygame.font.Font(None, 24)
 
@@ -121,6 +110,8 @@ class InfoText(pygame.sprite.DirtySprite):
         self.text = ""
         self.image = self._create_surface()
 
+        MySprite.__init__(self, Location.SOUTH, position, screen)
+
         self.logger.debug(str(self) + ': init done, image=' + str(self.image) + ", rect=" + str(self.rect))
 
     def set_text(self, text):
@@ -128,23 +119,15 @@ class InfoText(pygame.sprite.DirtySprite):
             self.logger.debug(str(self) + '.set_text(' + text + ')')
             self.text = text
             self.image = self._create_surface()
+            return True
+        return False
 
     def _create_surface(self):
         surface = pygame.Surface((self.rect.width, self.rect.height)).convert_alpha()
         surface.fill(pygame.Color(0,0,0,0)) # fully transparent
         surface.blit(self.font.render(self.text, 1, colors.grey), (5, 0))
-        self._make_dirty()
+        # self._make_dirty()
         return surface
-
-    def set_position(self, x, y):
-        self.logger.debug(str(self) + '.set_position(' + str((x,y)) + ')')
-        self.rect.x, self.rect.y = x, y
-        self._make_dirty()
-        return self.rect.copy()
-
-    def _make_dirty(self):
-        if self.dirty != 2:
-            self.dirty = 1
 
 
 class Player(Scene):
@@ -165,17 +148,17 @@ class Player(Scene):
 
         self.screen_size = browser.view_port.size
 
-        self.top_grad = Gradient(size=(self.screen_size[0],45),position=(0,0))
+        self.top_grad = Gradient(size=(self.screen_size[0],45),position=(0,0), location=Location.NORTH, screen=browser.view_port)
         self.sprites.add(self.top_grad)
-        self.bottom_grad = Gradient(size=(self.screen_size[0],60),position=(0,self.screen_size[1]-60), top_down=False, fill=0.5)
+        self.bottom_grad = Gradient(size=(self.screen_size[0],60),position=(0,self.screen_size[1]-60), location=Location.SOUTH, screen=browser.view_port, fill=0.5)
         self.sprites.add(self.bottom_grad)
 
         self.previous_btn = self.create_button('previous', self.mympd.previous)
         self.next_btn = self.create_button('next', self.mympd.next)
         self.play_btn = self.create_toggle_button('play', self.play, 'pause', self.pause)
         self.stop_btn = self.create_button('stop', self.stop)
-        self.list_btn = self.create_button('list', (lambda: self.go_to(browser)))
-        self.exit_btn = self.create_button('exit', self.exit)
+        self.list_btn = self.create_button('list', (lambda: self.go_to(browser)), Location.NORTH)
+        self.exit_btn = self.create_button('exit', self.exit, Location.NORTH)
         self.vol_down_btn = self.create_button('vol_down', (lambda: self.set_vol(int(self.mympd.status()['volume']) - 5)))
         self.vol_up_btn = self.create_button('vol_up', (lambda: self.set_vol(int(self.mympd.status()['volume']) + 5)))
 
@@ -183,7 +166,7 @@ class Player(Scene):
         self.progress = Progress()
         self.sprites.add(self.progress)
 
-        self.info_text = InfoText(self.screen_size[0], (0,self.screen_size[1]-20))
+        self.info_text = InfoText(self.screen_size[0], (0,self.screen_size[1]-20), browser.view_port)
         self.sprites.add(self.info_text)
 
         self.background = pygame.display.get_surface().convert()
@@ -194,23 +177,25 @@ class Player(Scene):
         btns = [self.previous_btn, self.next_btn, self.play_btn, self.stop_btn, self.vol_down_btn, self.vol_up_btn]
         for i in range(len(btns)):
             x = self.x_offset(i, len(btns))
-            btns[i].set_position(x,y)
+            btns[i].set_position((x,y))
 
         # buttons at top right corner of the screen, from right to left
         y = self.x_offset(0,7)
-        self.exit_btn.set_position(self.x_offset(len(btns)-1, len(btns)),y)
+        self.exit_btn.set_position((self.x_offset(len(btns)-1, len(btns)),y))
 
         i -= 1
         x = self.x_offset(i, len(btns))
-        self.list_btn.set_position(x,y)
+        self.list_btn.set_position((x,y))
 
-    def create_button(self, name, callback):
-        btn = Button(name, callback)
+        self.time = time.clock()
+
+    def create_button(self, name, callback, location=Location.SOUTH):
+        btn = Button(name, callback, location)
         self.sprites.add(btn)
         return btn
 
-    def create_toggle_button(self, name1, callback1, name2, callback2):
-        btn = ToggleButton(name1, callback1, name2, callback2)
+    def create_toggle_button(self, name1, callback1, name2, callback2, location=Location.SOUTH):
+        btn = ToggleButton(name1, callback1, name2, callback2, location)
         self.sprites.add(btn)
         return btn
 
@@ -261,6 +246,7 @@ class Player(Scene):
         self.mytft.exit()
 
     def handle(self, event):
+        self.time = time.clock()
         if event.type == pygame.MOUSEBUTTONDOWN:
             clicked_buttons = [b for b in self.sprites if b.rect.collidepoint(event.pos)]
             if clicked_buttons:
@@ -273,8 +259,6 @@ class Player(Scene):
         self.sprites.clear(screen, self.cover_img[0])
 
     def draw(self, surface):
-        result = []
-
         status = self.mympd.status()
 
         # proceed button
@@ -294,7 +278,8 @@ class Player(Scene):
             text = str(status['track']) + " - " + text
         elif 'song' in status:
             text = str(int(status['song']) + 1) + " - " + text
-        self.info_text.set_text(text)
+        if self.info_text.set_text(text):
+            self.time = time.clock() # dit zal zorgen dat buttons en names opnieuw getoond worden
 
         # album-art tekenen
         if self.dirty:
@@ -305,9 +290,21 @@ class Player(Scene):
                 s._make_dirty()
             self.sprites.clear(surface, self.background)
 
+        # disappear?
+        if self.time:
+            if time.clock() - self.time > 20: # seconds inactivity
+                for sprite in self.sprites:
+                    if hasattr(sprite, 'disappear'):
+                        sprite.disappear()
+                self.time = None
+            else:
+                for sprite in self.sprites:
+                    if hasattr(sprite, 'reappear'):
+                        sprite.reappear()
+
         # sprites tekenen
         self.sprites.update()
-        result.extend(self.sprites.draw(surface))
+        result = self.sprites.draw(surface)
         self.dirty = False
 
         return result

@@ -57,8 +57,7 @@ class ScrollPane(Scene):
         return x,y
 
     def create_button(self, name, callback, x, y):
-        btn = Button(name, callback)
-        btn.set_position(x,y)
+        btn = Button(name, callback, None, (x,y))
         self.allSprites.add(btn)
         return btn
 
